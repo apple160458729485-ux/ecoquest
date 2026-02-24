@@ -5,9 +5,13 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, onValue, push, ref } from "firebase/database";
 import { Camera, Crosshair } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
-
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+let MapView, Marker;
+if (Platform.OS !== 'web') {
+  const Maps = require('react-native-maps');
+  MapView = Maps.default;
+  Marker = Maps.Marker;
+}
 // --- 設定エリア (各自のキーを入力) ---
 const genAI = new GoogleGenerativeAI("AIzaSyBydO6RU-hLZV_Fu690t0AJOsSjWFilcRw");
 const firebaseConfig = { 
