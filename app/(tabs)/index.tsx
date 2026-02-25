@@ -5,11 +5,17 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, onValue, push, ref } from "firebase/database";
 import { Camera, Crosshair } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform } from 'react-native';
 let MapView, Marker;
 if (Platform.OS !== 'web') {
   const Maps = require('react-native-maps');
-  MapView = Maps.default;
+  MapView = {Platform.OS !== 'web' && (
+  <MapView ... />
+)}
+{Platform.OS === 'web' && (
+  <View><Text>マップはWeb版では準備中です</Text></View>
+)}
   Marker = Maps.Marker;
 }
 // --- 設定エリア (各自のキーを入力) ---
