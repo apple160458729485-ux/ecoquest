@@ -5,20 +5,26 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, onValue, push, ref } from "firebase/database";
 import { Camera, Crosshair } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Platform } from 'react-native';
-let MapView, Marker;
+import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+// --- 地図のWeb対応設定 ---
+let MapView: any, Marker: any;
 if (Platform.OS !== 'web') {
   const Maps = require('react-native-maps');
-  MapView = {Platform.OS !== 'web' && (
-  <MapView ... />
-)}
-{Platform.OS === 'web' && (
-  <View><Text>マップはWeb版では準備中です</Text></View>
-)}
+  MapView = Maps.default;
   Marker = Maps.Marker;
+} else {
+  // Web版では地図の代わりに空のViewを表示する代用品
+  MapView = ({ children, style }: any) => (
+    <View style={[style, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}>
+      <Text>マップはWeb版では準備中です（スマホアプリ版で表示されます）</Text>
+    </View>
+  );
+  Marker = () => null;
 }
-// --- 設定エリア (各自のキーを入力) ---
+
+// --- 設定エリア ---
+// 注意：APIキーは本来VercelのEnvironment Variablesで管理するのが安全です
 const genAI = new GoogleGenerativeAI("AIzaSyBydO6RU-hLZV_Fu690t0AJOsSjWFilcRw");
 const firebaseConfig = { 
   apiKey: "AIzaSyBydO6RU-hLZV_Fu690t0AJOsSjWFilcRw",
@@ -39,7 +45,6 @@ export default function EcoQuestFinal() {
   const [markers, setMarkers] = useState<any[]>([]);
   const cameraRef = useRef<any>(null);
 
-  // 1. Firebaseからリアルタイムで他人のピンも読み込む
   useEffect(() => {
     const markersRef = ref(db, 'markers/');
     onValue(markersRef, (snapshot) => {
@@ -51,7 +56,6 @@ export default function EcoQuestFinal() {
     });
   }, []);
 
-  // 2. 本物のAI認識ロジック (Gemini API)
   const analyzeImageWithGemini = async (base64Photo: string) => {
     const model = genAI.getGenerativeModel({ model: "models/gemini-1.5-flash" });
     const prompt = "この画像にあるゴミを特定し、'素材名'だけを1単語で答えてください（例：ペットボトル、空き缶、紙くず）";
@@ -63,18 +67,21 @@ export default function EcoQuestFinal() {
     return result.response.text();
   };
 
-  // 3. 撮影・分析・共有の実行
   const handleCaptureAndUpload = async () => {
     if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync({ base64: true });
-      Alert.alert("AI解析中...", "守護獣がゴミを鑑定しています...");
-
       try {
-        // AIでゴミを判別
-        const trashType = await analyzeImageWithGemini(photo.base64);
-        const loc = await Location.getCurrentPositionAsync({});
+        const photo = await cameraRef.current.takePictureAsync({ base64: true });
+        Alert.alert("AI解析中...", "守護獣がゴミを鑑定しています...");
 
-        // Firebaseへ保存（これで全員にリアルタイム共有される）
+        const trashType = await analyzeImageWithGemini(photo.base64);
+        let loc = { coords: { latitude: 35.6812, longitude: 139.7671 } }; // デフォルト（東京駅）
+        
+        try {
+          loc = await Location.getCurrentPositionAsync({});
+        } catch (e) {
+          console.log("位置情報が取得できませんでした。デフォルト値を使用します。");
+        }
+
         push(ref(db, 'markers/'), {
           lat: loc.coords.latitude,
           lng: loc.coords.longitude,
@@ -84,9 +91,9 @@ export default function EcoQuestFinal() {
 
         Alert.alert("成功！", `AIが「${trashType}」を認識しました。世界に共有されました！`);
         setMode('MAP');
-      } catch (error) {
-        console.error(error); // パソコンの画面に詳しいエラーを出す
-        Alert.alert("エラー詳細", error.message); // スマホ画面に原因を表示する
+      } catch (error: any) {
+        console.error(error);
+        Alert.alert("エラー", error.message);
       }
     }
   };
@@ -94,13 +101,13 @@ export default function EcoQuestFinal() {
   return (
     <View style={styles.container}>
       {mode === 'MAP' ? (
-        <MapView style={styles.fullScreen} showsUserLocation>
-          {markers.map((m) => (
+        <MapView style={styles.fullScreen} showsUserLocation={true}>
+          {markers.map((m: any) => (
             <Marker 
               key={m.id} 
               coordinate={{latitude: m.lat, longitude: m.lng}} 
               title={m.type}
-              pinColor={m.type === 'ペットボトル' ? 'blue' : 'green'}
+              pinColor={m.type.includes('ペットボトル') ? 'blue' : 'green'}
             />
           ))}
         </MapView>
